@@ -154,32 +154,29 @@ def teacher_dashboard():
 
 # -------------------------
 # STUDENT DASHBOARD
-# -------------------------
 def student_dashboard():
     st.title("👨‍🎓 Student Resources")
-        # LOGOUT BUTTON
+
+    # LOGOUT BUTTON
     if st.button("🚪 Logout"):
         st.session_state.logged_in = False
         st.session_state.role = None
         st.experimental_rerun()
 
-
     metadata = load_metadata()
 
-    if len(metadata) == 0:
-        st.info("No files uploaded yet.")
-        return
+    st.header("Available Study Materials")
 
     for item in metadata:
         st.write(f"### 📄 {item['filename']}")
         st.write(f"📝 {item['description']}")
-        st.write(f"📅 Uploaded at: {item['uploaded_at']}")
+        st.write(f"📅 {item['uploaded_at']}")
 
-        st.download_button(
-            "Download",
-            data=open(os.path.join(DATA_FOLDER, item["filename"]), "rb").read(),
-            file_name=item["filename"]
-        )
+        file_path = os.path.join(DATA_FOLDER, item["filename"])
+
+        with open(file_path, "rb") as f:
+            st.download_button("Download", f, file_name=item["filename"])
+
         st.markdown("---")
 
 
@@ -196,5 +193,6 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
+
 
 
