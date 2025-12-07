@@ -1,3 +1,4 @@
 streamlit
 pandas
-sqlite3-binary
+# sqlite3 is built-in, do NOT include sqlite3-binary
+
