@@ -1,96 +1,160 @@
 import streamlit as st
+import os
+import json
+from datetime import datetime
 
-# ---------------------------------------------
-# CONFIG: Teacher + 5 Students (A to F)
-# ---------------------------------------------
-USERS = {
-    "teacher": {"username": "teacher", "password": "teacher123", "role": "teacher"},
-    "student_a": {"username": "a", "password": "a123", "role": "student"},
-    "student_b": {"username": "b", "password": "b123", "role": "student"},
-    "student_c": {"username": "c", "password": "c123", "role": "student"},
-    "student_d": {"username": "d", "password": "d123", "role": "student"},
-    "student_e": {"username": "e", "password": "e123", "role": "student"},
-    "student_f": {"username": "f", "password": "f123", "role": "student"},
+# -------------------------
+# CONFIG
+# -------------------------
+TEACHER_USERNAME = "teacher"
+TEACHER_PASSWORD = "12345"
+
+STUDENTS = {
+    "a": "a123",
+    "b": "b123",
+    "c": "c123",
+    "d": "d123",
+    "e": "e123",
+    "f": "f123"
 }
 
-# Storage for resources & vocabulary
-if "resources" not in st.session_state:
-    st.session_state.resources = []
-if "vocab" not in st.session_state:
-    st.session_state.vocab = []
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "role" not in st.session_state:
-    st.session_state.role = None
+DATA_FOLDER = "uploaded_files"
+META_FILE = "file_metadata.json"
 
-# ---------------------------------------------
+# Ensure folders exist
+if not os.path.exists(DATA_FOLDER):
+    os.makedirs(DATA_FOLDER)
+
+if not os.path.exists(META_FILE):
+    with open(META_FILE, "w") as f:
+        json.dump([], f, indent=4)
+
+
+# -------------------------
+# LOAD / SAVE METADATA
+# -------------------------
+def load_metadata():
+    with open(META_FILE, "r") as f:
+        return json.load(f)
+
+
+def save_metadata(data):
+    with open(META_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+# -------------------------
 # LOGIN PAGE
-# ---------------------------------------------
-def login_page():
-    st.title("French Learning Portal 🇫🇷")
+# -------------------------
+def login():
+    st.title("📚 French Classroom Portal")
+
+    role = st.selectbox("I am a", ["Teacher", "Student"])
 
     username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    pw = st.text_input("Password", type="password")
 
     if st.button("Login"):
-        for user in USERS.values():
-            if username == user["username"] and password == user["password"]:
+        if role == "Teacher":
+            if username == TEACHER_USERNAME and pw == TEACHER_PASSWORD:
+                st.session_state.role = "teacher"
                 st.session_state.logged_in = True
-                st.session_state.role = user["role"]
-                st.success(f"Welcome, {username}!")
-                return
-        st.error("Invalid username or password.")
+            else:
+                st.error("❌ Invalid teacher credentials.")
 
-# ---------------------------------------------
+        else:  # Student
+            if username in STUDENTS and pw == STUDENTS[username]:
+                st.session_state.role = "student"
+                st.session_state.username = username
+                st.session_state.logged_in = True
+            else:
+                st.error("❌ Invalid student credentials.")
+
+
+# -------------------------
 # TEACHER DASHBOARD
-# ---------------------------------------------
+# -------------------------
 def teacher_dashboard():
-    st.title("Teacher Dashboard 👩‍🏫")
+    st.title("👩‍🏫 Teacher Dashboard")
 
-    st.subheader("Upload Resources")
-    res = st.text_area("Add resource text (lesson, notes, PDF link, etc.)")
-    if st.button("Add Resource"):
-        if res:
-            st.session_state.resources.append(res)
-            st.success("Resource added.")
+    st.subheader("Upload New Study Material")
 
-    st.subheader("Add Vocabulary Words")
-    word = st.text_input("Vocabulary Word")
-    meaning = st.text_input("Meaning")
-    if st.button("Add Vocab"):
-        if word and meaning:
-            st.session_state.vocab.append({"word": word, "meaning": meaning})
-            st.success("Vocabulary added.")
+    uploaded_file = st.file_uploader(
+        "Choose file to upload",
+        type=["pdf", "png", "jpg", "jpeg", "mp4", "mp3", "txt", "docx"]
+    )
+    description = st.text_input("Description (optional)")
 
-    st.subheader("Current Resources")
-    for r in st.session_state.resources:
-        st.markdown(f"- {r}")
+    if st.button("Upload"):
+        if uploaded_file:
+            file_path = os.path.join(DATA_FOLDER, uploaded_file.name)
 
-    st.subheader("Vocabulary List")
-    for v in st.session_state.vocab:
-        st.markdown(f"**{v['word']}** → {v['meaning']}")
+            # Save file
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.read())
 
-# ---------------------------------------------
+            # Save metadata
+            metadata = load_metadata()
+            metadata.append({
+                "filename": uploaded_file.name,
+                "description": description,
+                "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            })
+            save_metadata(metadata)
+
+            st.success("✅ File uploaded successfully!")
+        else:
+            st.error("Please select a file before uploading.")
+
+    st.divider()
+    st.subheader("📁 All Uploaded Materials")
+
+    metadata = load_metadata()
+    for item in metadata:
+        st.write(f"**📄 {item['filename']}**")
+        st.write(f"📝 {item['description']}")
+        st.write(f"📅 Uploaded at: {item['uploaded_at']}")
+        st.download_button(
+            "Download",
+            data=open(os.path.join(DATA_FOLDER, item["filename"]), "rb").read(),
+            file_name=item["filename"]
+        )
+        st.markdown("---")
+
+
+# -------------------------
 # STUDENT DASHBOARD
-# ---------------------------------------------
+# -------------------------
 def student_dashboard():
-    st.title("Student Dashboard 🎓")
+    st.title("👨‍🎓 Student Resources")
 
-    st.sidebar.markdown(f"**Resources:** {len(st.session_state.resources)}  **Vocab:** {len(st.session_state.vocab)}")
+    metadata = load_metadata()
 
-    st.header("Study Materials")
-    for r in st.session_state.resources:
-        st.markdown(f"- {r}")
+    if len(metadata) == 0:
+        st.info("No files uploaded yet.")
+        return
 
-    st.header("Vocabulary List")
-    for v in st.session_state.vocab:
-        st.markdown(f"**{v['word']}** → {v['meaning']}")
+    for item in metadata:
+        st.write(f"### 📄 {item['filename']}")
+        st.write(f"📝 {item['description']}")
+        st.write(f"📅 Uploaded at: {item['uploaded_at']}")
 
-# ---------------------------------------------
-# MAIN APP LOGIC
-# ---------------------------------------------
+        st.download_button(
+            "Download",
+            data=open(os.path.join(DATA_FOLDER, item["filename"]), "rb").read(),
+            file_name=item["filename"]
+        )
+        st.markdown("---")
+
+
+# -------------------------
+# APP LOGIC
+# -------------------------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
 if not st.session_state.logged_in:
-    login_page()
+    login()
 else:
     if st.session_state.role == "teacher":
         teacher_dashboard()
