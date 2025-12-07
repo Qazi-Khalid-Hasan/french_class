@@ -73,7 +73,6 @@ def login():
 
 # -------------------------
 # TEACHER DASHBOARD
-# -------------------------
 def teacher_dashboard():
     st.title("👩‍🏫 Teacher Dashboard")
 
@@ -110,16 +109,41 @@ def teacher_dashboard():
     st.subheader("📁 All Uploaded Materials")
 
     metadata = load_metadata()
+    new_metadata = []
+
     for item in metadata:
         st.write(f"**📄 {item['filename']}**")
         st.write(f"📝 {item['description']}")
         st.write(f"📅 Uploaded at: {item['uploaded_at']}")
-        st.download_button(
-            "Download",
-            data=open(os.path.join(DATA_FOLDER, item["filename"]), "rb").read(),
-            file_name=item["filename"]
-        )
+
+        file_path = os.path.join(DATA_FOLDER, item["filename"])
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Download
+            st.download_button(
+                "Download",
+                data=open(file_path, "rb").read(),
+                file_name=item["filename"]
+            )
+
+        with col2:
+            # Delete Button
+            if st.button(f"❌ Delete {item['filename']}"):
+                # Remove physical file
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                st.warning(f"Deleted: {item['filename']}")
+            else:
+                # Keep if not deleted
+                new_metadata.append(item)
+
         st.markdown("---")
+
+    # Save updated list excluding deleted ones
+    save_metadata(new_metadata)
+
 
 
 # -------------------------
@@ -160,3 +184,4 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
+
