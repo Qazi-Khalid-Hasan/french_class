@@ -75,13 +75,13 @@ def login():
 # TEACHER DASHBOARD
 def teacher_dashboard():
     st.title("👩‍🏫 Teacher Dashboard")
-        # LOGOUT BUTTON
+
+    # LOGOUT BUTTON
     if st.button("🚪 Logout"):
         st.session_state.logged_in = False
         st.session_state.role = None
         st.experimental_rerun()
 
-    
     st.subheader("Upload New Study Material")
 
     uploaded_file = st.file_uploader(
@@ -127,7 +127,6 @@ def teacher_dashboard():
         col1, col2 = st.columns(2)
 
         with col1:
-            # Download
             st.download_button(
                 "Download",
                 data=open(file_path, "rb").read(),
@@ -135,19 +134,15 @@ def teacher_dashboard():
             )
 
         with col2:
-            # Delete Button
             if st.button(f"❌ Delete {item['filename']}"):
-                # Remove physical file
                 if os.path.exists(file_path):
                     os.remove(file_path)
                 st.warning(f"Deleted: {item['filename']}")
             else:
-                # Keep if not deleted
                 new_metadata.append(item)
 
         st.markdown("---")
 
-    # Save updated list excluding deleted ones
     save_metadata(new_metadata)
 
 
@@ -193,6 +188,7 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
+
 
 
 
