@@ -343,7 +343,7 @@ cur.execute("SELECT COUNT(*) as c FROM words")
 num_words = cur.fetchone()[0]
 conn.close()
 
-st.sidebar.markdown(f"**Resources:** {num_res}  
-**Vocab:** {num_words}")
+st.sidebar.markdown(f"**Resources:** {num_res} **Vocab:** {num_words}")
 
 # End of file
+
