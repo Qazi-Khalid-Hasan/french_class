@@ -156,7 +156,7 @@ def student_dashboard():
     if st.button("🚪 Logout"):
         st.session_state.logged_in = False
         st.session_state.role = None
-        st.experimental_rerun()
+        st.rerun()
 
     metadata = load_metadata()
 
@@ -188,6 +188,7 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
+
 
 
 
