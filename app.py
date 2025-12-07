@@ -75,7 +75,13 @@ def login():
 # TEACHER DASHBOARD
 def teacher_dashboard():
     st.title("👩‍🏫 Teacher Dashboard")
+        # LOGOUT BUTTON
+    if st.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.session_state.role = None
+        st.experimental_rerun()
 
+    
     st.subheader("Upload New Study Material")
 
     uploaded_file = st.file_uploader(
@@ -151,6 +157,12 @@ def teacher_dashboard():
 # -------------------------
 def student_dashboard():
     st.title("👨‍🎓 Student Resources")
+        # LOGOUT BUTTON
+    if st.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.session_state.role = None
+        st.experimental_rerun()
+
 
     metadata = load_metadata()
 
@@ -184,4 +196,5 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
+
 
