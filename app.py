@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 # -------------------- CONFIG --------------------
-st.set_page_config(page_title="FrenchClass Hub", layout="wide")
+st.set_page_config(page_title="FrenchClass File Hub", layout="wide")
 
 USERS = {
     "admin": {"password": "admin123", "role": "admin"},
@@ -15,8 +15,30 @@ USERS = {
 
 DATA_FOLDER = "uploaded_files"
 LOG_FILE = "activity_log.txt"
+META_FILE = "file_metadata.txt"
 
 os.makedirs(DATA_FOLDER, exist_ok=True)
+
+# -------------------- SAVE FILE METADATA --------------------
+def save_file_metadata(filename):
+    time_now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    with open(META_FILE, "a") as f:
+        f.write(f"{filename}|{time_now}\n")
+
+# -------------------- LOAD FILE METADATA --------------------
+def load_files():
+    data = {}
+    if not os.path.exists(META_FILE):
+        return data
+
+    with open(META_FILE, "r") as f:
+        for line in f:
+            try:
+                name, dt = line.strip().split("|")
+                data[name] = {"uploaded_at": dt}
+            except:
+                pass
+    return data
 
 # -------------------- LOGGING --------------------
 def log_event(user, action, filename=""):
@@ -24,82 +46,79 @@ def log_event(user, action, filename=""):
     with open(LOG_FILE, "a") as f:
         f.write(f"{timestamp} | {user} | {action} | {filename}\n")
 
-# -------------------- LOGIN SYSTEM --------------------
+# -------------------- LOGIN --------------------
 def login():
-    st.title("📘 FrenchClass Hub")
+    st.title("🔐 FrenchClass File Hub Login")
 
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
-    login_button = st.button("Login")
-
-    if login_button:
+    if st.button("Login"):
         if username in USERS and USERS[username]["password"] == password:
             st.session_state["user"] = username
             st.session_state["role"] = USERS[username]["role"]
             log_event(username, "LOGIN")
+            st.rerun()
         else:
             st.error("Wrong username or password.")
 
 # -------------------- ADMIN PAGE --------------------
 def admin_dashboard():
-    st.title("👑 Admin Panel")
-    st.info("Admin can only view activity logs.")
+    st.title("👑 Admin Dashboard")
+    st.info("View activity logs below:")
 
-    st.subheader("Activity Logs")
     if os.path.exists(LOG_FILE):
         with open(LOG_FILE, "r") as f:
             st.text(f.read())
     else:
-        st.warning("No logs available.")
+        st.warning("No logs yet.")
 
     if st.button("Logout"):
-        log_event(st.session_state["user"], "LOGOUT")
         st.session_state.clear()
+        st.rerun()
 
 # -------------------- TEACHER PAGE --------------------
 def teacher_dashboard():
     st.title("👨‍🏫 Teacher Dashboard")
-    st.success("Upload and delete files.")
 
-    upload = st.file_uploader("Upload file", type=["pdf", "docx", "txt", "jpg", "png", "mp4"])
+    file = st.file_uploader("Upload file", type=None)
+    if file:
+        filepath = os.path.join(DATA_FOLDER, file.name)
+        with open(filepath, "wb") as f:
+            f.write(file.read())
+        save_file_metadata(file.name)
+        log_event(st.session_state["user"], "UPLOAD", file.name)
+        st.success(f"Uploaded: {file.name}")
+        st.rerun()
 
-    if upload:
-        path = os.path.join(DATA_FOLDER, upload.name)
-        with open(path, "wb") as f:
-            f.write(upload.read())
-        log_event(st.session_state["user"], "UPLOAD", upload.name)
-        st.success(f"Uploaded: {upload.name}")
+    st.subheader("Uploaded Files")
+    files = load_files()
 
-    st.subheader("Files")
+    for file_name in sorted(files, reverse=True):
+        path = os.path.join(DATA_FOLDER, file_name)
 
-    files = os.listdir(DATA_FOLDER)
-
-    for f_name in files:
-        file_path = os.path.join(DATA_FOLDER, f_name)
-
-        st.write(f"📄 **{f_name}**")
+        st.write(f"📄 {file_name}")
 
         col1, col2 = st.columns(2)
 
         with col1:
-            with open(file_path, "rb") as f:
-                st.download_button("⬇️ Download", f, file_name=f_name)
+            with open(path, "rb") as f:
+                st.download_button("⬇️ Download", data=f, file_name=file_name)
 
         with col2:
-            if st.button(f"🗑 Delete {f_name}"):
-                os.remove(file_path)
-                log_event(st.session_state["user"], "DELETE", f_name)
-                st.warning(f"Deleted {f_name}")
-                st.session_state["refresh"] = True
+            if st.button(f"🗑 Delete {file_name}"):
+                os.remove(path)
+                log_event(st.session_state["user"], "DELETE", file_name)
+                st.warning(f"Deleted {file_name}")
+                st.rerun()
 
     if st.button("Logout"):
-        log_event(st.session_state["user"], "LOGOUT")
         st.session_state.clear()
+        st.rerun()
 
 # -------------------- STUDENT PAGE --------------------
 def student_dashboard():
-    st.title("📚 Study Materials")
+    st.title("🎓 Study Materials")
 
     files = load_files()
 
@@ -109,7 +128,7 @@ def student_dashboard():
 
     st.subheader("Available Files (Newest First)")
 
-    # Sort files by uploaded date (DESC)
+    # sort by latest timestamp
     files_sorted = sorted(files.items(), key=lambda x: x[1]["uploaded_at"], reverse=True)
 
     for file_name, info in files_sorted:
@@ -118,24 +137,26 @@ def student_dashboard():
         with st.expander(f"{file_name} — Uploaded on {info['uploaded_at']}"):
             with open(file_path, "rb") as f:
                 st.download_button(
-                    label="📥 Download",
+                    "📥 Download",
                     data=f,
                     file_name=file_name,
                     use_container_width=True
                 )
 
-           
+            log_event(st.session_state["user"], "VIEW", file_name)
 
-# -------------------- ROUTER --------------------
+    if st.button("Logout"):
+        st.session_state.clear()
+        st.rerun()
+
+# -------------------- ROUTING --------------------
 if "user" not in st.session_state:
     login()
 else:
     role = st.session_state["role"]
-
     if role == "admin":
         admin_dashboard()
     elif role == "teacher":
         teacher_dashboard()
     else:
         student_dashboard()
-
