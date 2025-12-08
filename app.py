@@ -105,7 +105,7 @@ def sidebar_ui():
         st.sidebar.markdown("---")
         if st.sidebar.button("Logout"):
             safe_logout()
-            st.experimental_rerun()
+            st.rerun()
 
 # -------------------- PAGES --------------------
 def page_teacher_files():
@@ -265,3 +265,4 @@ else:
             page_admin_export_logs()
     else:
         st.warning("Unknown role. Contact administrator.")
+
