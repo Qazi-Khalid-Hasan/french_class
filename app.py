@@ -4,6 +4,7 @@
 # STUDENTS → can only view/download files
 
 import streamlit as st
+from streamlit_extras.app_logo import add_logo
 import os
 from datetime import datetime
 
@@ -11,7 +12,7 @@ st.set_page_config(page_title="Class App", layout="wide")
 
 # ------------------ CONFIG ------------------
 USERS = {
-    "admin": {"password": "admin132", "role": "admin"},
+    "admin": {"password": "admin123", "role": "admin"},
     "teacher": {"password": "12345", "role": "teacher"},
     "a": {"password": "a123", "role": "student"},
     "b": {"password": "b123", "role": "student"},
@@ -27,7 +28,8 @@ os.makedirs(DATA_FOLDER, exist_ok=True)
 def log_event(user, action, filename=""):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_FILE, "a") as log:
-        log.write(f"{timestamp} | {user} | {action} | {filename}")
+        log.write(f"{timestamp} | {user} | {action} | {filename}
+")
 
 # ---------------- LOGIN SYSTEM ----------------
 def login():
@@ -113,6 +115,35 @@ def student_dashboard():
         st.session_state.clear()
         st.experimental_rerun()
 
+# ---------------- SIDEBAR UI ----------------
+def sidebar_ui():
+    with st.sidebar:
+        st.markdown("""
+            <div style='text-align:center;'>
+                <img src='https://cdn-icons-png.flaticon.com/512/3135/3135755.png' width='90'>
+                <h2 style='margin-top:10px;'>📘 French Class</h2>
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.markdown(f"### 👤 Logged in as: **{st.session_state['user'].upper()}**")
+        st.markdown(f"**Role:** `{st.session_state['role']}`")
+        st.markdown("---")
+
+        st.markdown("#### 🌐 Navigation")
+        if st.session_state['role'] == 'admin':
+            st.markdown("✔️ Admin Dashboard")
+        elif st.session_state['role'] == 'teacher':
+            st.markdown("✔️ Teacher Dashboard")
+        else:
+            st.markdown("✔️ Student Dashboard")
+
+        st.markdown("---")
+        if st.button("🚪 Logout", key="logout_sidebar"):
+            log_event(st.session_state['user'], "LOGOUT")
+            st.session_state.clear()
+            st.experimental_rerun()
+
 # ---------------- ROUTER ----------------
 if "user" not in st.session_state:
     login()
@@ -124,4 +155,3 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
-
