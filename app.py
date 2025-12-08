@@ -99,38 +99,32 @@ def teacher_dashboard():
 
 # -------------------- STUDENT PAGE --------------------
 def student_dashboard():
-    st.title("🎓 Student Dashboard")
-    st.info("Files sorted by latest upload date.")
+    st.title("📚 Study Materials")
 
-    files = os.listdir(DATA_FOLDER)
-    files = sorted(files, key=lambda x: os.path.getmtime(os.path.join(DATA_FOLDER, x)), reverse=True)
+    files = load_files()
 
-    for f_name in files:
-        file_path = os.path.join(DATA_FOLDER, f_name)
-        date = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M")
+    if not files:
+        st.info("No files uploaded yet.")
+        return
 
-        st.markdown(f"### 📄 {f_name}")
-        st.caption(f"Uploaded: {date}")
+    st.subheader("Available Files (Newest First)")
 
-        # PREVIEW (text and PDFs)
-        if f_name.lower().endswith(".txt"):
-            with open(file_path, "r", errors="ignore") as f:
-                st.text(f.read()[:400])
+    # Sort files by uploaded date (DESC)
+    files_sorted = sorted(files.items(), key=lambda x: x[1]["uploaded_at"], reverse=True)
 
-        if f_name.lower().endswith(".pdf"):
-            st.pdf(file_path)
+    for file_name, info in files_sorted:
+        file_path = os.path.join(DATA_FOLDER, file_name)
 
-        # DOWNLOAD
-        with open(file_path, "rb") as f:
-            st.download_button("⬇️ Download", f, file_name=f_name)
+        with st.expander(f"{file_name} — Uploaded on {info['uploaded_at']}"):
+            with open(file_path, "rb") as f:
+                st.download_button(
+                    label="📥 Download",
+                    data=f,
+                    file_name=file_name,
+                    use_container_width=True
+                )
 
-        log_event(st.session_state["user"], "VIEW", f_name)
-
-        st.markdown("---")
-
-    if st.button("Logout"):
-        log_event(st.session_state["user"], "LOGOUT")
-        st.session_state.clear()
+           
 
 # -------------------- ROUTER --------------------
 if "user" not in st.session_state:
@@ -144,3 +138,4 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
+
