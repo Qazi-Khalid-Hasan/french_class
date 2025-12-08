@@ -1,209 +1,135 @@
 import streamlit as st
 import os
-import json
 from datetime import datetime
 
-# -------------------------
-# USERS
-# -------------------------
-ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin133"
+# -------------------- CONFIG --------------------
+st.set_page_config(page_title="Class File System", layout="wide")
 
-TEACHER_USERNAME = "teacher"
-TEACHER_PASSWORD = "12345"
-
-STUDENTS = {
-    "a": "a123",
-    "b": "b123",
-    "c": "c123",
-    "d": "d123",
-    "e": "e123",
-    "f": "f123"
+USERS = {
+    "admin": {"password": "admin123", "role": "admin"},
+    "teacher": {"password": "12345", "role": "teacher"},
+    "a": {"password": "a123", "role": "student"},
+    "b": {"password": "b123", "role": "student"},
+    "c": {"password": "c123", "role": "student"},
 }
 
-# -------------------------
-# FOLDERS
-# -------------------------
-DATA_FOLDER = "data"
-FILES_FOLDER = "uploaded_files"
-LOG_FILE = "activity_log.json"
+DATA_FOLDER = "uploaded_files"
+LOG_FILE = "activity_log.txt"
 
 os.makedirs(DATA_FOLDER, exist_ok=True)
-os.makedirs(FILES_FOLDER, exist_ok=True)
 
-# -------------------------
-# ACTIVITY LOGGING
-# -------------------------
-def log_activity(user, action, details=""):
-    log_path = os.path.join(DATA_FOLDER, LOG_FILE)
-    logs = []
+# -------------------- LOGGING --------------------
+def log_event(user, action, filename=""):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_FILE, "a") as f:
+        f.write(f"{timestamp} | {user} | {action} | {filename}\n")
 
-    if os.path.exists(log_path):
-        with open(log_path, "r") as f:
-            try:
-                logs = json.load(f)
-            except:
-                logs = []
-
-    logs.append({
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "user": user,
-        "action": action,
-        "details": details
-    })
-
-    with open(log_path, "w") as f:
-        json.dump(logs, f, indent=4)
-
-# -------------------------
-# LOGIN PAGE
-# -------------------------
+# -------------------- LOGIN --------------------
 def login():
-    st.title("📘 Smart Study App")
-
-    st.write("Login to continue")
+    st.title("📘 Class File System")
 
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
     if st.button("Login"):
-        # Admin Login
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            st.session_state["role"] = "admin"
-            st.session_state["username"] = username
-            log_activity(username, "login")
-            st.experimental_rerun()
-
-        # Teacher Login
-        elif username == TEACHER_USERNAME and password == TEACHER_PASSWORD:
-            st.session_state["role"] = "teacher"
-            st.session_state["username"] = username
-            log_activity(username, "login")
-            st.experimental_rerun()
-
-        # Student Login
-        elif username in STUDENTS and password == STUDENTS[username]:
-            st.session_state["role"] = "student"
-            st.session_state["username"] = username
-            log_activity(username, "login")
+        if username in USERS and USERS[username]["password"] == password:
+            st.session_state["user"] = username
+            st.session_state["role"] = USERS[username]["role"]
+            log_event(username, "LOGIN")
             st.experimental_rerun()
         else:
-            st.error("Incorrect username or password.")
+            st.error("Wrong username or password.")
 
-# -------------------------
-# ADMIN DASHBOARD
-# -------------------------
+# -------------------- ADMIN PAGE --------------------
 def admin_dashboard():
-    st.title("👨‍💼 Admin Dashboard")
-    st.subheader("Activity Logs")
+    st.title("👑 Admin Panel")
+    st.info("Admin can only view activity logs.")
 
-    log_path = os.path.join(DATA_FOLDER, LOG_FILE)
-
-    if os.path.exists(log_path):
-        with open(log_path, "r") as f:
-            logs = json.load(f)
-
-        for entry in logs:
-            st.write(
-                f"**{entry['timestamp']}** | **{entry['user']}** → {entry['action']} ({entry['details']})"
-            )
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "r") as f:
+            st.text(f.read())
     else:
-        st.info("No logs yet.")
+        st.warning("No logs available.")
 
     if st.button("Logout"):
+        log_event(st.session_state["user"], "LOGOUT")
         st.session_state.clear()
         st.experimental_rerun()
 
-# -------------------------
-# TEACHER DASHBOARD
-# -------------------------
+# -------------------- TEACHER PAGE --------------------
 def teacher_dashboard():
-    st.title("👩‍🏫 Teacher Dashboard")
+    st.title("👨‍🏫 Teacher Dashboard")
+    st.success("Upload and delete files here.")
 
-    st.subheader("Upload Study Materials")
-    uploaded = st.file_uploader("Upload file", type=["pdf", "docx", "png", "jpg", "jpeg"])
+    # Upload
+    file = st.file_uploader("Upload file", type=["pdf", "docx", "txt", "jpg", "png", "mp4"])
+    if file:
+        filepath = os.path.join(DATA_FOLDER, file.name)
+        with open(filepath, "wb") as f:
+            f.write(file.read())
+        log_event(st.session_state["user"], "UPLOAD", file.name)
+        st.success(f"Uploaded: {file.name}")
 
-    if uploaded:
-        save_path = os.path.join(FILES_FOLDER, uploaded.name)
-        with open(save_path, "wb") as f:
-            f.write(uploaded.read())
-
-        st.success(f"{uploaded.name} uploaded successfully.")
-        log_activity("teacher", "uploaded file", uploaded.name)
-
-    st.subheader("Manage Uploaded Files")
-    files = sorted(
-        os.listdir(FILES_FOLDER),
-        key=lambda x: os.path.getmtime(os.path.join(FILES_FOLDER, x)),
-        reverse=True
-    )
+    # List files
+    st.subheader("Files")
+    files = os.listdir(DATA_FOLDER)
 
     for f_name in files:
-        col1, col2, col3 = st.columns([3, 1, 1])
+        path = os.path.join(DATA_FOLDER, f_name)
 
-        file_path = os.path.join(FILES_FOLDER, f_name)
-        mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
+        st.write(f"📄 {f_name}")
+        col1, col2 = st.columns(2)
 
-        col1.write(f"📄 **{f_name}**")
-        col1.caption(f"Uploaded on {mtime}")
+        with col1:
+            with open(path, "rb") as f:
+                st.download_button("⬇️ Download", data=f, file_name=f_name)
 
-        with open(file_path, "rb") as f:
-            col2.download_button("Download", f, file_name=f_name)
-
-        if col3.button("❌ Delete", key=f_name):
-            os.remove(file_path)
-            log_activity("teacher", "deleted file", f_name)
-            st.warning(f"{f_name} deleted.")
-            st.experimental_rerun()
+        with col2:
+            if st.button(f"🗑 Delete {f_name}"):
+                os.remove(path)
+                log_event(st.session_state["user"], "DELETE", f_name)
+                st.warning(f"Deleted {f_name}")
+                st.experimental_rerun()
 
     if st.button("Logout"):
+        log_event(st.session_state["user"], "LOGOUT")
         st.session_state.clear()
         st.experimental_rerun()
 
-# -------------------------
-# STUDENT DASHBOARD
-# -------------------------
+# -------------------- STUDENT PAGE --------------------
 def student_dashboard():
     st.title("🎓 Student Dashboard")
+    st.info("Files sorted by latest upload date.")
 
-    st.subheader("Study Materials (Sorted by Date)")
-
-    files = sorted(
-        os.listdir(FILES_FOLDER),
-        key=lambda x: os.path.getmtime(os.path.join(FILES_FOLDER, x)),
-        reverse=True
-    )
+    files = os.listdir(DATA_FOLDER)
+    files = sorted(files, key=lambda x: os.path.getmtime(os.path.join(DATA_FOLDER, x)), reverse=True)
 
     for f_name in files:
-        file_path = os.path.join(FILES_FOLDER, f_name)
-        file_type = f_name.split(".")[-1].lower()
-        mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
+        path = os.path.join(DATA_FOLDER, f_name)
+        date = datetime.fromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d %H:%M")
 
-        st.write(f"### 📄 {f_name}")
-        st.caption(f"Uploaded on: {mtime}")
+        st.markdown(f"### 📄 {f_name}")
+        st.caption(f"Uploaded on: {date}")
 
-        # ---------- File Preview ----------
-        if file_type in ["png", "jpg", "jpeg"]:
-            st.image(file_path)
-        elif file_type == "pdf":
-            st.write(f"Preview not supported here, download instead.")
-        elif file_type == "docx":
-            st.write("DOCX preview not supported, download to view.")
+        # Preview only text files
+        if f_name.lower().endswith(".txt"):
+            with open(path, "r") as f:
+                st.text(f.read()[:300])
 
-        # ---------- Download ----------
-        with open(file_path, "rb") as f:
-            st.download_button("Download File", f, file_name=f_name)
+        with open(path, "rb") as f:
+            st.download_button("⬇️ Download", data=f, file_name=f_name)
 
-        st.divider()
+        log_event(st.session_state["user"], "VIEW", f_name)
+
+        st.markdown("---")
 
     if st.button("Logout"):
+        log_event(st.session_state["user"], "LOGOUT")
         st.session_state.clear()
         st.experimental_rerun()
 
-# -------------------------
-# MAIN APP CONTROLLER
-# -------------------------
-if "role" not in st.session_state:
+# -------------------- ROUTING --------------------
+if "user" not in st.session_state:
     login()
 else:
     role = st.session_state["role"]
