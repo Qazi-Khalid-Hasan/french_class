@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 # -------------------- CONFIG --------------------
-st.set_page_config(page_title="Class File System", layout="wide")
+st.set_page_config(page_title="Portail de Classe (Class Portal)", layout="wide")
 
 USERS = {
     "admin": {"password": "admin123", "role": "admin"},
@@ -70,6 +70,7 @@ def teacher_dashboard():
             f.write(file.read())
         log_event(st.session_state["user"], "UPLOAD", file.name)
         st.success(f"Uploaded: {file.name}")
+        st.experimental_rerun()
 
     # List files
     st.subheader("📂 Uploaded Files")
@@ -112,15 +113,21 @@ def student_dashboard():
         st.markdown(f"### 📄 {f_name}")
         st.caption(f"Uploaded on: {date}")
 
-        # Preview for text files
+        # ---- TEXT PREVIEW ----
         if f_name.lower().endswith(".txt"):
             with open(path, "r") as f:
-                st.text(f.read()[:300])
+                st.text(f.read()[:400])
 
-        # Preview for images
+        # ---- IMAGE PREVIEW ----
         if f_name.lower().endswith((".jpg", ".png")):
             st.image(path, width=300)
 
+        # ---- PDF PREVIEW ----
+        if f_name.lower().endswith(".pdf"):
+            st.write("📘 PDF Preview:")
+            st.pdf(path)
+
+        # Download button
         with open(path, "rb") as f:
             st.download_button("⬇️ Download", data=f, file_name=f_name)
 
