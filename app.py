@@ -27,8 +27,7 @@ os.makedirs(DATA_FOLDER, exist_ok=True)
 def log_event(user, action, filename=""):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_FILE, "a") as log:
-        log.write(f"{timestamp} | {user} | {action} | {filename}
-")
+        log.write(f"{timestamp} | {user} | {action} | {filename}")
 
 # ---------------- LOGIN SYSTEM ----------------
 def login():
@@ -125,3 +124,4 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
+
