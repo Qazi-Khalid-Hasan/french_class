@@ -1,15 +1,11 @@
 # app.py
-# Streamlit app: Admin (view logs) / Teacher (upload/delete) / Student (view/download)
-# Fixed logout behavior to avoid AttributeError on st.experimental_rerun
-
 import streamlit as st
 import os
 from datetime import datetime
 import pandas as pd
 
-st.set_page_config(page_title="Class App", layout="wide")
-
-# ---------------- CONFIG ----------------
+# -------------------- CONFIG --------------------
+st.set_page_config(layout="wide")
 USERS = {
     "admin":   {"password": "admin123", "role": "admin"},
     "teacher": {"password": "12345",   "role": "teacher"},
@@ -17,17 +13,15 @@ USERS = {
     "b":       {"password": "b123",    "role": "student"},
     "c":       {"password": "c123",    "role": "student"},
 }
-
 DATA_FOLDER = "uploaded_files"
 LOG_FILE = "audit_log.txt"
-
 os.makedirs(DATA_FOLDER, exist_ok=True)
 
-# ---------------- Helpers ----------------
+# -------------------- HELPERS --------------------
 def log_event(user, action, filename=""):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(LOG_FILE, "a", encoding="utf-8") as log:
-        log.write(f"{timestamp} | {user} | {action} | {filename}\n")
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"{ts} | {user} | {action} | {filename}\n")
 
 def read_logs():
     if not os.path.exists(LOG_FILE):
@@ -37,9 +31,9 @@ def read_logs():
 
 def logs_to_df(lines):
     rows = []
-    for l in lines:
-        parts = [p.strip() for p in l.split("|")]
-        if len(parts) >= 4:
+    for L in lines:
+        parts = [p.strip() for p in L.split("|")]
+        if len(parts) == 4:
             rows.append({
                 "timestamp": parts[0],
                 "user": parts[1],
@@ -50,80 +44,77 @@ def logs_to_df(lines):
         return pd.DataFrame(rows)
     return pd.DataFrame(columns=["timestamp","user","action","filename"])
 
-# Safer logout: set keys to None instead of clearing entire session_state
-def logout():
+def safe_logout():
     user = st.session_state.get("user")
     if user:
         log_event(user, "LOGOUT")
-    # set values to None or delete only known keys
-    for k in ["user","role"]:
+    # remove only our keys
+    for k in ("user","role","page"):
         if k in st.session_state:
             del st.session_state[k]
-    # rerun to show login screen (safe because we didn't clear internal session objects)
-    st.experimental_rerun()
 
-# ---------------- UI: Login ----------------
-def login_page():
-    st.title("Login")
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Login")
-        if submitted:
-            username = username.strip()
-            if username in USERS and USERS[username]["password"] == password:
-                st.session_state["user"] = username
-                st.session_state["role"] = USERS[username]["role"]
-                log_event(username, "LOGIN")
-                st.experimental_rerun()
+# -------------------- DEFAULT PROFESSIONAL LOGO (SVG) --------------------
+# Small square "FC" logo encoded as an inline SVG. Rendered in the sidebar.
+LOGO_SVG = """
+<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'>
+  <rect rx='10' ry='10' width='64' height='64' fill='#0b5ed7'/>
+  <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='26' fill='white'>FC</text>
+</svg>
+"""
+SVG_DATA_URI = "data:image/svg+xml;utf8," + LOGO_SVG
+
+# -------------------- UI: SIDEBAR --------------------
+def sidebar_ui():
+    # Brand & nav
+    st.sidebar.markdown(f"<div style='display:flex;align-items:center;gap:12px'>"
+                        f"<img src=\"{SVG_DATA_URI}\" width='48'/>"
+                        f"<div style='font-weight:600'>French Class Portal</div></div>",
+                        unsafe_allow_html=True)
+    st.sidebar.markdown("---")
+    # Show login or user info
+    if "user" not in st.session_state:
+        st.sidebar.subheader("Sign in")
+        username = st.sidebar.text_input("Username", key="login_user")
+        password = st.sidebar.text_input("Password", type="password", key="login_pw")
+        if st.sidebar.button("Login", key="login_btn"):
+            u = username.strip()
+            p = password
+            if u and u in USERS and USERS[u]["password"] == p:
+                st.session_state["user"] = u
+                st.session_state["role"] = USERS[u]["role"]
+                st.session_state["page"] = "home"
+                log_event(u, "LOGIN")
             else:
-                st.error("Invalid username or password")
-
-# ---------------- Admin Dashboard ----------------
-def admin_dashboard():
-    st.title("Admin Dashboard — Activity Monitor")
-    st.info("Admin can only view logs and export them. No upload/delete here.")
-    lines = read_logs()
-    if not lines:
-        st.warning("No activity logs found.")
+                st.sidebar.error("Invalid username or password")
+        st.sidebar.markdown("Default accounts: admin/teacher/a/b/c")
     else:
-        df = logs_to_df(reversed(lines))  # show most recent first
-        st.subheader("Recent activity (most recent first)")
-        n = st.slider("How many rows to show", min_value=10, max_value=1000, value=100, step=10)
-        st.dataframe(df.head(n))
-        st.markdown("---")
-        # summary metrics
-        st.subheader("Summary statistics")
-        logins = df[df["action"] == "LOGIN"].groupby("user").size().reset_index(name="login_count")
-        uploads = df[df["action"] == "UPLOAD"].groupby("user").size().reset_index(name="upload_count")
-        deletes = df[df["action"] == "DELETE"].groupby("user").size().reset_index(name="delete_count")
-        st.write("Logins per user")
-        st.table(logins)
-        st.write("Uploads per user")
-        st.table(uploads)
-        st.write("Deletes per user")
-        st.table(deletes)
-        # teacher-specific deletes (teacher usernames are those in USERS with role teacher)
-        teacher_usernames = [u for u,r in USERS.items() if r["role"] == "teacher"]
-        teacher_deletes = deletes[deletes["user"].isin(teacher_usernames)]
-        st.write("Teacher deletes")
-        st.table(teacher_deletes)
+        st.sidebar.write(f"**{st.session_state['user']}**")
+        st.sidebar.write(f"*{st.session_state['role']}*")
+        st.sidebar.markdown("---")
+        # navigation depending on role
+        role = st.session_state["role"]
+        if role == "admin":
+            page = st.sidebar.radio("Admin menu", ["Activity Dashboard", "Export Logs"], index=0)
+            st.session_state["page"] = "admin_" + page.lower().replace(" ", "_")
+        elif role == "teacher":
+            page = st.sidebar.radio("Teacher menu", ["Files", "Uploads History"], index=0)
+            st.session_state["page"] = "teacher_" + page.lower().replace(" ", "_")
+        else:
+            page = st.sidebar.radio("Student menu", ["Files"], index=0)
+            st.session_state["page"] = "student_files"
+        st.sidebar.markdown("---")
+        if st.sidebar.button("Logout"):
+            safe_logout()
+            st.experimental_rerun()
 
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download full logs (CSV)", csv, file_name="audit_log.csv", mime="text/csv")
-
-    if st.button("Logout"):
-        logout()
-
-# ---------------- Teacher Dashboard ----------------
-def teacher_dashboard():
-    st.title("Teacher Dashboard — Upload & Manage Files")
-    st.success("Only teacher(s) can upload and delete files. Actions are logged.")
-
-    st.subheader("Upload file")
-    uploaded = st.file_uploader("Choose file to upload", type=None)
+# -------------------- PAGES --------------------
+def page_teacher_files():
+    st.header("Teacher — Manage Files")
+    st.write("Upload files for students. Deleting files is permanent and logged.")
+    # upload
+    uploaded = st.file_uploader("Upload a file", type=None, key="teacher_uploader")
     if uploaded is not None:
-        # safe-saver: if same name exists append timestamp
+        # safe overwrite handling
         save_name = uploaded.name
         save_path = os.path.join(DATA_FOLDER, save_name)
         if os.path.exists(save_path):
@@ -134,66 +125,143 @@ def teacher_dashboard():
         with open(save_path, "wb") as f:
             f.write(uploaded.read())
         log_event(st.session_state["user"], "UPLOAD", save_name)
-        st.success(f"Saved file: {save_name}")
-        st.experimental_rerun()
+        st.success(f"Saved {save_name}")
 
-    st.subheader("Files available to students")
+    st.markdown("### Files available to students")
     files = sorted(os.listdir(DATA_FOLDER))
     if not files:
         st.info("No files uploaded yet.")
-    else:
-        for fn in files:
-            cols = st.columns([6,1,1])
-            cols[0].write(fn)
-            # download button (teacher can also download)
-            path = os.path.join(DATA_FOLDER, fn)
-            with open(path, "rb") as f:
-                data = f.read()
-            if cols[2].download_button("Download", data, file_name=fn, key=f"t_dl_{fn}"):
-                log_event(st.session_state["user"], "DOWNLOAD", fn)
-            if cols[1].button("Delete", key=f"del_{fn}"):
-                try:
-                    os.remove(path)
-                    log_event(st.session_state["user"], "DELETE", fn)
-                    st.warning(f"Deleted {fn}")
-                    st.experimental_rerun()
-                except Exception as e:
-                    st.error(f"Failed to delete {fn}: {e}")
+        return
+    for fn in files:
+        col1, col2, col3 = st.columns([6,1,1])
+        col1.write(fn)
+        # download
+        path = os.path.join(DATA_FOLDER, fn)
+        with open(path, "rb") as f:
+            data = f.read()
+        if col2.download_button("Download", data, file_name=fn, key=f"t_dl_{fn}"):
+            log_event(st.session_state["user"], "DOWNLOAD", fn)
+        # delete (teacher only)
+        if col3.button("Delete", key=f"del_{fn}"):
+            try:
+                os.remove(path)
+                log_event(st.session_state["user"], "DELETE", fn)
+                st.warning(f"Deleted {fn}")
+                # after delete, refresh the app (safe place to rerun)
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Could not delete {fn}: {e}")
 
-    if st.button("Logout"):
-        logout()
+def page_teacher_uploads_history():
+    st.header("Upload / Delete History")
+    lines = read_logs()
+    if not lines:
+        st.info("No activity recorded.")
+        return
+    df = logs_to_df(reversed(lines))
+    # show only upload/delete ops
+    df_ops = df[df["action"].isin(["UPLOAD","DELETE"])].copy()
+    if df_ops.empty:
+        st.info("No uploads or deletes yet.")
+        return
+    st.dataframe(df_ops)
+    st.download_button("Export upload/delete (CSV)", df_ops.to_csv(index=False).encode("utf-8"), file_name="uploads_history.csv")
 
-# ---------------- Student Dashboard ----------------
-def student_dashboard():
-    st.title("Student Dashboard — View & Download")
-    st.info("Students can view and download files. They cannot upload or delete.")
-
+def page_student_files():
+    st.header("Student — Available Files")
+    st.write("You can download files made available by the teacher.")
     files = sorted(os.listdir(DATA_FOLDER))
     if not files:
-        st.info("No files available. Check back later.")
-    else:
-        for fn in files:
-            cols = st.columns([6,1])
-            cols[0].write(fn)
-            path = os.path.join(DATA_FOLDER, fn)
-            with open(path, "rb") as f:
-                data = f.read()
-            # log DOWNLOAD only if user actually clicks the button:
-            if cols[1].download_button("Download", data, file_name=fn, key=f"s_dl_{fn}"):
-                log_event(st.session_state["user"], "DOWNLOAD", fn)
+        st.info("No files available.")
+        return
+    for fn in files:
+        path = os.path.join(DATA_FOLDER, fn)
+        with open(path, "rb") as f:
+            data = f.read()
+        if st.download_button(fn, data, file_name=fn, key=f"s_dl_{fn}"):
+            log_event(st.session_state["user"], "DOWNLOAD", fn)
 
-    if st.button("Logout"):
-        logout()
+def page_admin_activity_dashboard():
+    st.header("Admin — Activity Dashboard")
+    st.write("Overview of app activity (LOGIN, UPLOAD, DELETE, DOWNLOAD).")
+    lines = read_logs()
+    if not lines:
+        st.info("No activity logs found.")
+        return
+    df = logs_to_df(reversed(lines))
+    st.subheader("Recent activity")
+    st.dataframe(df.head(200))
 
-# ---------------- Router ----------------
+    st.subheader("Summary Metrics")
+    # compute metrics
+    logins = df[df["action"] == "LOGIN"].groupby("user").size().reset_index(name="logins")
+    uploads = df[df["action"] == "UPLOAD"].groupby("user").size().reset_index(name="uploads")
+    deletes = df[df["action"] == "DELETE"].groupby("user").size().reset_index(name="deletes")
+    downloads = df[df["action"] == "DOWNLOAD"].groupby("user").size().reset_index(name="downloads")
+
+    col1, col2 = st.columns(2)
+    col1.write("Logins per user")
+    col1.table(logins)
+    col2.write("Uploads per user")
+    col2.table(uploads)
+
+    col3, col4 = st.columns(2)
+    col3.write("Deletes per user")
+    col3.table(deletes)
+    col4.write("Downloads per user")
+    col4.table(downloads)
+
+    # teacher deletes specifically
+    teacher_usernames = [u for u,v in USERS.items() if v["role"] == "teacher"]
+    teacher_deletes = deletes[deletes["user"].isin(teacher_usernames)]
+    st.write("Teacher delete counts")
+    st.table(teacher_deletes)
+
+    # simple charts
+    st.subheader("Activity chart (counts by action)")
+    action_counts = df.groupby("action").size().rename("count").reset_index()
+    st.bar_chart(action_counts.set_index("action"))
+
+    # export
+    st.download_button("Download full logs (CSV)", df.to_csv(index=False).encode("utf-8"), file_name="audit_log.csv")
+
+def page_admin_export_logs():
+    st.header("Admin — Export Logs")
+    lines = read_logs()
+    if not lines:
+        st.info("No logs to export.")
+        return
+    df = logs_to_df(reversed(lines))
+    st.download_button("Download logs (CSV)", df.to_csv(index=False).encode("utf-8"), file_name="audit_log.csv")
+
+# -------------------- ROUTER & START --------------------
+sidebar_ui()
+
+# decide which page to show
+page = st.session_state.get("page", None)
+role = st.session_state.get("role", None)
+
 if "user" not in st.session_state:
-    login_page()
+    # no user logged in; show a clean landing area (professional)
+    st.title("French Class Portal")
+    st.markdown("Please sign in from the left-hand panel.")
+    st.write("")
+    st.write("If you are an admin, teacher or student, use the credentials in the sidebar to log in.")
 else:
-    role = st.session_state.get("role")
-    st.sidebar.write(f"Logged in as: **{st.session_state.get('user')}** ({role})")
-    if role == "admin":
-        admin_dashboard()
-    elif role == "teacher":
-        teacher_dashboard()
+    # role-based routing
+    if role == "teacher":
+        if page == "teacher_files":
+            page_teacher_files()
+        elif page == "teacher_uploads_history":
+            page_teacher_uploads_history()
+        else:
+            page_teacher_files()
+    elif role == "student":
+        page_student_files()
+    elif role == "admin":
+        if page == "admin_activity_dashboard":
+            page_admin_activity_dashboard()
+        else:
+            page_admin_export_logs()
     else:
-        student_dashboard()
+        st.warning("Unknown role. Contact administrator.")
