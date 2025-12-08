@@ -63,19 +63,38 @@ def login():
             st.error("Wrong username or password.")
 
 # -------------------- ADMIN PAGE --------------------
+# -------------------- ADMIN PAGE --------------------
 def admin_dashboard():
     st.title("👑 Admin Dashboard")
     st.info("View activity logs below:")
 
+    # Display logs
     if os.path.exists(LOG_FILE):
         with open(LOG_FILE, "r") as f:
             st.text(f.read())
     else:
         st.warning("No logs yet.")
 
+    st.markdown("---")
+    st.subheader("🧹 Manage Logs")
+
+    # Clear logs button
+    if st.button("🗑 Clear Full Log History"):
+        # Delete the log file
+        if os.path.exists(LOG_FILE):
+            os.remove(LOG_FILE)
+
+        # Recreate with note
+        with open(LOG_FILE, "w") as f:
+            f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | admin | LOGS CLEARED |\n")
+
+        st.success("All previous log history has been cleared.")
+        st.rerun()
+
     if st.button("Logout"):
         st.session_state.clear()
         st.rerun()
+
 
 # -------------------- TEACHER PAGE --------------------
 def teacher_dashboard():
@@ -160,3 +179,4 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
+
