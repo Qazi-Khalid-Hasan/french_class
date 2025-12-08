@@ -27,6 +27,7 @@ def log_event(user, action, filename=""):
 # -------------------- LOGIN --------------------
 def login():
     st.title("📘 Class File System")
+    st.subheader("Simple • Fast • Smart")
 
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
@@ -49,7 +50,7 @@ def admin_dashboard():
         with open(LOG_FILE, "r") as f:
             st.text(f.read())
     else:
-        st.warning("No logs available.")
+        st.warning("No logs available yet.")
 
     if st.button("Logout"):
         log_event(st.session_state["user"], "LOGOUT")
@@ -59,7 +60,7 @@ def admin_dashboard():
 # -------------------- TEACHER PAGE --------------------
 def teacher_dashboard():
     st.title("👨‍🏫 Teacher Dashboard")
-    st.success("Upload and delete files here.")
+    st.success("Upload and delete files.")
 
     # Upload
     file = st.file_uploader("Upload file", type=["pdf", "docx", "txt", "jpg", "png", "mp4"])
@@ -71,13 +72,13 @@ def teacher_dashboard():
         st.success(f"Uploaded: {file.name}")
 
     # List files
-    st.subheader("Files")
+    st.subheader("📂 Uploaded Files")
     files = os.listdir(DATA_FOLDER)
 
     for f_name in files:
         path = os.path.join(DATA_FOLDER, f_name)
 
-        st.write(f"📄 {f_name}")
+        st.write(f"📄 **{f_name}**")
         col1, col2 = st.columns(2)
 
         with col1:
@@ -111,10 +112,14 @@ def student_dashboard():
         st.markdown(f"### 📄 {f_name}")
         st.caption(f"Uploaded on: {date}")
 
-        # Preview only text files
+        # Preview for text files
         if f_name.lower().endswith(".txt"):
             with open(path, "r") as f:
                 st.text(f.read()[:300])
+
+        # Preview for images
+        if f_name.lower().endswith((".jpg", ".png")):
+            st.image(path, width=300)
 
         with open(path, "rb") as f:
             st.download_button("⬇️ Download", data=f, file_name=f_name)
