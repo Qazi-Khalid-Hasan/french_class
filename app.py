@@ -5,6 +5,40 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 
+
+
+import streamlit as st
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+
+# Load secrets from Streamlit
+client_id = st.secrets["CLIENT_ID"]
+client_secret = st.secrets["CLIENT_SECRET"]
+project_id = st.secrets["PROJECT_ID"]
+auth_uri = st.secrets["AUTH_URI"]
+token_uri = st.secrets["TOKEN_URI"]
+auth_provider = st.secrets["AUTH_PROVIDER_CERT_URL"]
+redirect_uri = st.secrets["REDIRECT_URI"]
+
+# Build credentials dictionary
+creds_dict = {
+    "installed": {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "project_id": project_id,
+        "auth_uri": auth_uri,
+        "token_uri": token_uri,
+        "auth_provider_x509_cert_url": auth_provider,
+        "redirect_uris": [redirect_uri]
+    }
+}
+
+credentials = Credentials.from_authorized_user_info(creds_dict["installed"])
+
+# Connect to Google Drive API
+service = build("drive", "v3", credentials=credentials)
+
+
 # -------------------- CONFIG --------------------
 st.set_page_config(page_title="FrenchClass File Hub", layout="wide")
 
@@ -232,3 +266,4 @@ else:
         teacher_dashboard()
     else:
         student_dashboard()
+
